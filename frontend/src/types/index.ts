@@ -8,7 +8,7 @@ export interface User {
   email: string;
   avatarColor: string;
   role: Role;
-  password: string;
+  password?: string;
 }
 
 export interface Project {

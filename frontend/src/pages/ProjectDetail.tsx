@@ -29,7 +29,7 @@ export default function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
   const {
     projects, tasks, users, currentUser,
-    moveTask, deleteTask, updateProjectMembers,
+    moveTask, deleteTask, updateProjectMembers, errors,
   } = useApp();
 
   const project = projects.find((p) => p.id === id);
@@ -51,13 +51,14 @@ export default function ProjectDetail() {
   const projectMembers = project.memberIds.map((mid) => users.find((u) => u.id === mid)!).filter(Boolean);
 
   const handleDragStart = (e: DragStartEvent) => setActiveId(String(e.active.id));
-  const handleDragEnd = (e: DragEndEvent) => {
+  const handleDragEnd = async (e: DragEndEvent) => {
     setActiveId(null);
     const taskId = String(e.active.id);
     const overId = e.over?.id ? String(e.over.id) : null;
     if (!overId) return;
     if (COLUMNS.includes(overId as TaskStatus)) {
-      moveTask(taskId, overId as TaskStatus);
+      const res = await moveTask(taskId, overId as TaskStatus);
+      if (!res.ok) toast.error(res.error ?? "Unable to move task");
     }
   };
 
@@ -75,6 +76,9 @@ export default function ProjectDetail() {
         <div className="min-w-0">
           <h1 className="text-3xl font-bold tracking-tight">{project.name}</h1>
           <p className="text-muted-foreground mt-1 max-w-2xl">{project.description}</p>
+          {(errors.projects || errors.tasks) && (
+            <p className="text-sm text-destructive mt-2">{errors.projects ?? errors.tasks}</p>
+          )}
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <div className="flex -space-x-2 mr-2">
@@ -105,9 +109,13 @@ export default function ProjectDetail() {
               tasks={projectTasks.filter((t) => t.status === col)}
               users={users}
               onEdit={(t) => { setEditingTask(t); setTaskOpen(true); }}
-              onDelete={(t) => {
+              onDelete={async (t) => {
                 if (!isAdmin) return;
-                if (confirm(`Delete task "${t.title}"?`)) { deleteTask(t.id); toast.success("Task deleted"); }
+                if (confirm(`Delete task "${t.title}"?`)) {
+                  const res = await deleteTask(t.id);
+                  if (!res.ok) { toast.error(res.error ?? "Unable to delete task"); return; }
+                  toast.success("Task deleted");
+                }
               }}
               canDelete={isAdmin}
             />
@@ -131,7 +139,11 @@ export default function ProjectDetail() {
         onOpenChange={setMembersOpen}
         project={project}
         users={users}
-        onSave={(ids) => { updateProjectMembers(project.id, ids); toast.success("Members updated"); }}
+        onSave={async (ids) => {
+          const res = await updateProjectMembers(project.id, ids);
+          if (!res.ok) { toast.error(res.error ?? "Unable to update members"); return; }
+          toast.success("Members updated");
+        }}
       />
     </div>
   );
@@ -139,7 +151,7 @@ export default function ProjectDetail() {
 
 function KanbanColumn({ status, tasks, users, onEdit, onDelete, canDelete }: {
   status: TaskStatus; tasks: Task[]; users: User[];
-  onEdit: (t: Task) => void; onDelete: (t: Task) => void; canDelete: boolean;
+  onEdit: (t: Task) => void; onDelete: (t: Task) => void | Promise<void>; canDelete: boolean;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: status });
   const accent = {
@@ -179,7 +191,7 @@ function KanbanColumn({ status, tasks, users, onEdit, onDelete, canDelete }: {
 
 function DraggableTask({ task, users, onEdit, onDelete, canDelete }: {
   task: Task; users: User[];
-  onEdit: (t: Task) => void; onDelete: (t: Task) => void; canDelete: boolean;
+  onEdit: (t: Task) => void; onDelete: (t: Task) => void | Promise<void>; canDelete: boolean;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: task.id });
   return (
@@ -196,7 +208,7 @@ function DraggableTask({ task, users, onEdit, onDelete, canDelete }: {
 
 function TaskCard({ task, users, onEdit, onDelete, canDelete, dragging }: {
   task: Task; users: User[];
-  onEdit?: (t: Task) => void; onDelete?: (t: Task) => void; canDelete?: boolean;
+  onEdit?: (t: Task) => void; onDelete?: (t: Task) => void | Promise<void>; canDelete?: boolean;
   dragging?: boolean;
 }) {
   const assignee = users.find((u) => u.id === task.assigneeId);
@@ -256,7 +268,7 @@ function TaskDialog({ open, onOpenChange, projectId, editingTask, members }: {
   open: boolean; onOpenChange: (o: boolean) => void;
   projectId: string; editingTask: Task | null; members: User[];
 }) {
-  const { createTask, updateTask } = useApp();
+  const { createTask, updateTask, loading } = useApp();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState<Priority>("medium");
@@ -280,21 +292,23 @@ function TaskDialog({ open, onOpenChange, projectId, editingTask, members }: {
     }
   }, [open, editingTask]);
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !dueDate) return;
     const iso = new Date(dueDate).toISOString();
     if (editingTask) {
-      updateTask(editingTask.id, {
+      const res = await updateTask(editingTask.id, {
         title: title.trim(), description: description.trim(), priority,
         status, dueDate: iso, assigneeId: assigneeId || null,
       });
+      if (!res.ok) { toast.error(res.error ?? "Unable to update task"); return; }
       toast.success("Task updated");
     } else {
-      createTask({
+      const res = await createTask({
         projectId, title: title.trim(), description: description.trim(),
         priority, status, dueDate: iso, assigneeId: assigneeId || null,
       });
+      if (!res.ok) { toast.error(res.error ?? "Unable to create task"); return; }
       toast.success("Task created");
     }
     onOpenChange(false);
@@ -354,8 +368,8 @@ function TaskDialog({ open, onOpenChange, projectId, editingTask, members }: {
             </div>
           </div>
           <DialogFooter>
-            <Button type="submit" className="gradient-primary text-white">
-              {editingTask ? "Save changes" : "Create task"}
+            <Button type="submit" disabled={loading.tasks} className="gradient-primary text-white">
+              {loading.tasks ? "Saving..." : editingTask ? "Save changes" : "Create task"}
             </Button>
           </DialogFooter>
         </form>
@@ -366,7 +380,7 @@ function TaskDialog({ open, onOpenChange, projectId, editingTask, members }: {
 
 function MembersDialog({ open, onOpenChange, project, users, onSave }: {
   open: boolean; onOpenChange: (o: boolean) => void;
-  project: Project; users: User[]; onSave: (ids: string[]) => void;
+  project: Project; users: User[]; onSave: (ids: string[]) => Promise<void>;
 }) {
   const [ids, setIds] = useState<string[]>(project.memberIds);
   useEffect(() => { if (open) setIds(project.memberIds); }, [open, project.memberIds]);
@@ -392,7 +406,7 @@ function MembersDialog({ open, onOpenChange, project, users, onSave }: {
           ))}
         </div>
         <DialogFooter>
-          <Button onClick={() => { onSave(ids); onOpenChange(false); }} className="gradient-primary text-white">Save</Button>
+          <Button onClick={async () => { await onSave(ids); onOpenChange(false); }} className="gradient-primary text-white">Save</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

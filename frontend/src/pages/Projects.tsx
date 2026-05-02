@@ -14,7 +14,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 
 export default function Projects() {
-  const { projects, tasks, users, currentUser, createProject, deleteProject } = useApp();
+  const { projects, tasks, users, currentUser, createProject, deleteProject, loading, errors } = useApp();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -28,10 +28,11 @@ export default function Projects() {
     return projects.filter((p) => p.memberIds.includes(currentUser.id));
   }, [projects, currentUser, isAdmin]);
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
-    createProject({ name: name.trim(), description: description.trim(), memberIds });
+    const res = await createProject({ name: name.trim(), description: description.trim(), memberIds });
+    if (!res.ok) { toast.error(res.error ?? "Unable to create project"); return; }
     setName(""); setDescription(""); setMemberIds([]);
     setOpen(false);
     toast.success("Project created");
@@ -43,6 +44,7 @@ export default function Projects() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Projects</h1>
           <p className="text-muted-foreground mt-1">Browse projects you have access to.</p>
+          {errors.projects && <p className="text-sm text-destructive mt-2">{errors.projects}</p>}
         </div>
         {isAdmin && (
           <Dialog open={open} onOpenChange={setOpen}>
@@ -79,7 +81,9 @@ export default function Projects() {
                   </div>
                 </div>
                 <DialogFooter>
-                  <Button type="submit" className="gradient-primary text-white">Create</Button>
+                  <Button type="submit" disabled={loading.projects} className="gradient-primary text-white">
+                    {loading.projects ? "Creating..." : "Create"}
+                  </Button>
                 </DialogFooter>
               </form>
             </DialogContent>
@@ -105,7 +109,13 @@ export default function Projects() {
                 </div>
                 {isAdmin && (
                   <button
-                    onClick={() => { if (confirm(`Delete project "${p.name}"?`)) { deleteProject(p.id); toast.success("Project deleted"); } }}
+                    onClick={async () => {
+                      if (confirm(`Delete project "${p.name}"?`)) {
+                        const res = await deleteProject(p.id);
+                        if (!res.ok) { toast.error(res.error ?? "Unable to delete project"); return; }
+                        toast.success("Project deleted");
+                      }
+                    }}
                     className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
                     aria-label="Delete project"
                   >

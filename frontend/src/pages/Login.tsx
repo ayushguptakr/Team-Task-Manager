@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 
 export default function Login() {
-  const { currentUser, login, signup } = useApp();
+  const { currentUser, login, signup, loading } = useApp();
   const navigate = useNavigate();
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [name, setName] = useState("");
@@ -17,9 +17,9 @@ export default function Login() {
 
   if (currentUser) return <Navigate to="/" replace />;
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const res = mode === "login" ? login(email, password) : signup(name, email, password);
+    const res = mode === "login" ? await login(email, password) : await signup(name, email, password);
     if (!res.ok) { toast.error(res.error ?? "Something went wrong"); return; }
     toast.success(mode === "login" ? "Welcome back!" : "Account created");
     navigate("/");
@@ -56,8 +56,8 @@ export default function Login() {
               <Label htmlFor="password">Password</Label>
               <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
             </div>
-            <Button type="submit" className="w-full gradient-primary text-white shadow-glow hover:opacity-95">
-              {mode === "login" ? "Sign in" : "Create account"}
+            <Button type="submit" disabled={loading.auth} className="w-full gradient-primary text-white shadow-glow hover:opacity-95">
+              {loading.auth ? "Please wait..." : mode === "login" ? "Sign in" : "Create account"}
             </Button>
           </form>
 

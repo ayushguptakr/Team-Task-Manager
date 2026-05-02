@@ -5,9 +5,10 @@ import { format, isPast, parseISO } from "date-fns";
 import { PriorityBadge } from "@/components/PriorityBadge";
 import { CheckSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 export default function MyTasks() {
-  const { tasks, projects, currentUser, updateTask } = useApp();
+  const { tasks, projects, currentUser, updateTask, errors } = useApp();
 
   const myTasks = useMemo(() => {
     if (!currentUser) return [];
@@ -27,6 +28,7 @@ export default function MyTasks() {
       <header className="mb-8">
         <h1 className="text-3xl font-bold tracking-tight">My Tasks</h1>
         <p className="text-muted-foreground mt-1">Everything assigned to you across all projects.</p>
+        {errors.tasks && <p className="text-sm text-destructive mt-2">{errors.tasks}</p>}
       </header>
 
       {myTasks.length === 0 ? (
@@ -53,7 +55,10 @@ export default function MyTasks() {
                       <input
                         type="checkbox"
                         checked={t.status === "done"}
-                        onChange={(e) => updateTask(t.id, { status: e.target.checked ? "done" : "todo" })}
+                        onChange={async (e) => {
+                          const res = await updateTask(t.id, { status: e.target.checked ? "done" : "todo" });
+                          if (!res.ok) toast.error(res.error ?? "Unable to update task");
+                        }}
                         className="h-4 w-4 accent-primary cursor-pointer"
                       />
                       <div className="flex-1 min-w-0">
