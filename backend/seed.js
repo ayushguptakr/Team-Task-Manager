@@ -1,5 +1,6 @@
 require('dotenv').config();
 const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
 const User = require('./models/User');
 const Project = require('./models/Project');
 const Task = require('./models/Task');
@@ -15,92 +16,266 @@ async function seed() {
     await mongoose.connect(process.env.MONGODB_URI);
     console.log('Connected to MongoDB.');
 
-    // Get all users
-    const users = await User.find({});
-    if (users.length === 0) {
-      console.log('No users found in database. Please run the previous seed or signup some users first.');
-      process.exit(0);
-    }
+    // ---- CLEAN SLATE ----
+    console.log('Clearing existing data...');
+    await Task.deleteMany({});
+    await Project.deleteMany({});
+    await User.deleteMany({});
+    console.log('Database cleared.');
 
-    const admin = users.find(u => u.role === 'admin') || users[0];
-    const regularUsers = users.filter(u => u._id.toString() !== admin._id.toString());
+    // ---- HASH PASSWORD ----
+    const hashedPassword = await bcrypt.hash('password123', 12);
 
-    console.log(`Found admin: ${admin.email}`);
-    console.log(`Found ${regularUsers.length} other users.`);
+    // ---- CREATE USERS ----
+    console.log('Creating users...');
+    const admin = await User.create({
+      name: 'Admin User',
+      email: 'admin@taskflow.com',
+      password: hashedPassword,
+      role: 'admin',
+    });
 
-    // 1. Create a "Shared Team Project" involving EVERYONE
-    let sharedProject = await Project.findOne({ name: 'Global Team Initiatives' });
-    if (!sharedProject) {
-      console.log('Creating Shared Team Project...');
-      
-      const members = [{ user: admin._id, role: 'admin' }];
-      regularUsers.forEach(u => {
-        members.push({ user: u._id, role: 'member' });
-      });
+    const jordan = await User.create({
+      name: 'Jordan Smith',
+      email: 'jordan@taskflow.com',
+      password: hashedPassword,
+      role: 'member',
+    });
 
-      sharedProject = await Project.create({
-        name: 'Global Team Initiatives',
-        description: 'A central project for all team members to collaborate.',
+    const priya = await User.create({
+      name: 'Priya Sharma',
+      email: 'priya@taskflow.com',
+      password: hashedPassword,
+      role: 'member',
+    });
+
+    const rahul = await User.create({
+      name: 'Rahul Verma',
+      email: 'rahul@taskflow.com',
+      password: hashedPassword,
+      role: 'member',
+    });
+
+    console.log('Users created:');
+    console.log(`  Admin:  ${admin.email}  (role: admin)`);
+    console.log(`  Jordan: ${jordan.email} (role: member)`);
+    console.log(`  Priya:  ${priya.email}  (role: member)`);
+    console.log(`  Rahul:  ${rahul.email}  (role: member)`);
+
+    // ---- CREATE PROJECTS ----
+    // Admin is the creator but NOT in the members array.
+    // Admin sees all projects via role-based access, not membership.
+    console.log('\nCreating projects...');
+
+    const project1 = await Project.create({
+      name: 'Website Redesign',
+      description: 'Overhaul the corporate website with a modern, responsive design.',
+      createdBy: admin._id,
+      members: [
+        { user: jordan._id, role: 'admin' },
+        { user: priya._id, role: 'member' },
+      ],
+    });
+
+    const project2 = await Project.create({
+      name: 'Mobile App MVP',
+      description: 'Build the first version of the cross-platform mobile application.',
+      createdBy: admin._id,
+      members: [
+        { user: priya._id, role: 'admin' },
+        { user: rahul._id, role: 'member' },
+      ],
+    });
+
+    const project3 = await Project.create({
+      name: 'API Integration Suite',
+      description: 'Develop and document REST APIs for third-party integrations.',
+      createdBy: admin._id,
+      members: [
+        { user: jordan._id, role: 'admin' },
+        { user: rahul._id, role: 'member' },
+      ],
+    });
+
+    console.log(`  Project 1: "${project1.name}" → Members: Jordan, Priya`);
+    console.log(`  Project 2: "${project2.name}" → Members: Priya, Rahul`);
+    console.log(`  Project 3: "${project3.name}" → Members: Jordan, Rahul`);
+
+    // ---- CREATE TASKS ----
+    console.log('\nCreating tasks...');
+
+    const now = Date.now();
+    const day = 24 * 60 * 60 * 1000;
+
+    // Project 1 tasks (Jordan + Priya)
+    await Task.insertMany([
+      {
+        title: 'Design homepage wireframes',
+        description: 'Create wireframes for the new homepage layout in Figma.',
+        status: 'in_progress',
+        priority: 'high',
+        project: project1._id,
+        assignee: jordan._id,
         createdBy: admin._id,
-        members: members
-      });
+        dueDate: new Date(now + 3 * day),
+      },
+      {
+        title: 'Setup design system tokens',
+        description: 'Define color palette, typography, and spacing variables.',
+        status: 'done',
+        priority: 'medium',
+        project: project1._id,
+        assignee: priya._id,
+        createdBy: admin._id,
+        dueDate: new Date(now - 2 * day),
+      },
+      {
+        title: 'Build responsive navigation',
+        description: 'Implement mobile-first navigation with hamburger menu.',
+        status: 'todo',
+        priority: 'high',
+        project: project1._id,
+        assignee: jordan._id,
+        createdBy: admin._id,
+        dueDate: new Date(now + 7 * day),
+      },
+      {
+        title: 'Create contact page',
+        description: 'Design and implement the contact form with validation.',
+        status: 'todo',
+        priority: 'low',
+        project: project1._id,
+        assignee: priya._id,
+        createdBy: admin._id,
+        dueDate: new Date(now + 10 * day),
+      },
+      {
+        title: 'SEO audit and meta tags',
+        description: 'Audit current SEO performance and add proper meta tags.',
+        status: 'in_progress',
+        priority: 'medium',
+        project: project1._id,
+        assignee: priya._id,
+        createdBy: admin._id,
+        dueDate: new Date(now + 5 * day),
+      },
+    ]);
 
-      // Create a task for each user in this shared project
-      const sharedTasks = [];
-      users.forEach((user, index) => {
-        const statuses = ['todo', 'in_progress', 'done'];
-        sharedTasks.push({
-          title: `Initial Setup for ${user.name.split(' ')[0]}`,
-          description: `Please complete your onboarding and setup your local environment.`,
-          status: statuses[index % 3],
-          priority: 'high',
-          project: sharedProject._id,
-          assignee: user._id,
-          createdBy: admin._id,
-        });
-      });
-      await Task.insertMany(sharedTasks);
-      console.log('Shared Team Project and collaborative tasks created!');
-    } else {
-      console.log('Shared Team Project already exists.');
-    }
+    // Project 2 tasks (Priya + Rahul)
+    await Task.insertMany([
+      {
+        title: 'Setup React Native project',
+        description: 'Initialize the React Native project with Expo.',
+        status: 'done',
+        priority: 'high',
+        project: project2._id,
+        assignee: rahul._id,
+        createdBy: admin._id,
+        dueDate: new Date(now - 5 * day),
+      },
+      {
+        title: 'Design login/signup screens',
+        description: 'Create UI mockups for authentication flow.',
+        status: 'in_progress',
+        priority: 'high',
+        project: project2._id,
+        assignee: priya._id,
+        createdBy: admin._id,
+        dueDate: new Date(now + 2 * day),
+      },
+      {
+        title: 'Implement push notifications',
+        description: 'Integrate Firebase Cloud Messaging for push notifications.',
+        status: 'todo',
+        priority: 'medium',
+        project: project2._id,
+        assignee: rahul._id,
+        createdBy: admin._id,
+        dueDate: new Date(now + 14 * day),
+      },
+      {
+        title: 'Build user profile screen',
+        description: 'Implement profile view with avatar upload and edit functionality.',
+        status: 'todo',
+        priority: 'low',
+        project: project2._id,
+        assignee: priya._id,
+        createdBy: admin._id,
+        dueDate: new Date(now + 12 * day),
+      },
+      {
+        title: 'Setup CI/CD pipeline',
+        description: 'Configure GitHub Actions for automated builds and deployments.',
+        status: 'in_progress',
+        priority: 'high',
+        project: project2._id,
+        assignee: rahul._id,
+        createdBy: admin._id,
+        dueDate: new Date(now + 4 * day),
+      },
+    ]);
 
-    // 2. Seed an individual project for every user who has 0 projects created by them
-    for (const user of users) {
-      const userProjectCount = await Project.countDocuments({ createdBy: user._id });
-      if (userProjectCount === 0) {
-        console.log(`Creating personal project for ${user.email}...`);
-        const p = await Project.create({
-          name: `${user.name.split(' ')[0]}'s Personal Workspace`,
-          description: 'Private tasks and personal notes.',
-          createdBy: user._id,
-          members: [{ user: user._id, role: 'admin' }]
-        });
+    // Project 3 tasks (Jordan + Rahul)
+    await Task.insertMany([
+      {
+        title: 'Define API schema',
+        description: 'Document all endpoint schemas using OpenAPI/Swagger spec.',
+        status: 'done',
+        priority: 'high',
+        project: project3._id,
+        assignee: jordan._id,
+        createdBy: admin._id,
+        dueDate: new Date(now - 3 * day),
+      },
+      {
+        title: 'Build authentication middleware',
+        description: 'Implement JWT-based auth middleware with refresh token support.',
+        status: 'in_progress',
+        priority: 'high',
+        project: project3._id,
+        assignee: rahul._id,
+        createdBy: admin._id,
+        dueDate: new Date(now + 1 * day),
+      },
+      {
+        title: 'Write integration tests',
+        description: 'Add Jest test suites for all critical API endpoints.',
+        status: 'todo',
+        priority: 'medium',
+        project: project3._id,
+        assignee: jordan._id,
+        createdBy: admin._id,
+        dueDate: new Date(now + 8 * day),
+      },
+      {
+        title: 'Rate limiting and throttling',
+        description: 'Implement rate limiting per-IP and per-user for all endpoints.',
+        status: 'todo',
+        priority: 'medium',
+        project: project3._id,
+        assignee: rahul._id,
+        createdBy: admin._id,
+        dueDate: new Date(now + 9 * day),
+      },
+    ]);
 
-        // Add a couple of tasks to their personal workspace
-        await Task.insertMany([
-          {
-            title: 'Review Weekly Goals',
-            description: 'Check personal goals for the week.',
-            status: 'todo',
-            priority: 'medium',
-            project: p._id,
-            assignee: user._id,
-            createdBy: user._id,
-          },
-          {
-            title: 'Organize files',
-            status: 'done',
-            priority: 'low',
-            project: p._id,
-            assignee: user._id,
-            createdBy: user._id,
-          }
-        ]);
-      }
-    }
+    console.log('  Project 1: 5 tasks created');
+    console.log('  Project 2: 5 tasks created');
+    console.log('  Project 3: 4 tasks created');
 
-    console.log('Seeding completed successfully. All users now have projects and tasks!');
+    console.log('\n========================================');
+    console.log('  SEEDING COMPLETE');
+    console.log('========================================');
+    console.log('  4 users | 3 projects | 14 tasks');
+    console.log('');
+    console.log('  Test Credentials (all use password123):');
+    console.log('  ──────────────────────────────────────');
+    console.log('  Admin:  admin@taskflow.com   → sees ALL 3 projects');
+    console.log('  Jordan: jordan@taskflow.com  → sees Project 1 & 3');
+    console.log('  Priya:  priya@taskflow.com   → sees Project 1 & 2');
+    console.log('  Rahul:  rahul@taskflow.com   → sees Project 2 & 3');
+    console.log('========================================\n');
+
     process.exit(0);
   } catch (error) {
     console.error('Error during seeding:', error);
