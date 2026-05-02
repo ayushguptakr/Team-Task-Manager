@@ -70,8 +70,8 @@ export default function Login() {
         </div>
 
         <div className="mt-6 text-xs text-muted-foreground bg-accent/50 border border-accent rounded-lg p-3 text-center">
-          <strong>Demo:</strong> admin@taskflow.demo / password (Admin) /
-          jordan@taskflow.demo / password (Member)
+          <strong>Demo:</strong> admin@taskflow.com / password123 (Admin) /
+          jordan@taskflow.com / password123 (Member)
         </div>
       </div>
     </div>
