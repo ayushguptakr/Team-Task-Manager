@@ -32,7 +32,7 @@ export default function Login() {
           <div className="h-10 w-10 rounded-xl gradient-primary flex items-center justify-center shadow-glow">
             <ListTodo className="h-5 w-5 text-white" />
           </div>
-          <span className="font-bold text-2xl tracking-tight">Team Task Manager</span>
+          <span className="font-bold text-2xl tracking-tight">TaskFlow</span>
         </div>
 
         <div className="bg-card rounded-2xl shadow-elegant-lg border p-8">

@@ -22,7 +22,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           <div className="h-8 w-8 rounded-lg gradient-primary flex items-center justify-center shadow-glow">
             <ListTodo className="h-4 w-4 text-white" />
           </div>
-          <span className="font-bold text-white text-lg tracking-tight">Team Task Manager</span>
+          <span className="font-bold text-white text-lg tracking-tight">TaskFlow</span>
         </div>
 
         <nav className="flex-1 px-3 py-4 space-y-1">
@@ -72,7 +72,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           <div className="h-7 w-7 rounded-lg gradient-primary flex items-center justify-center">
             <ListTodo className="h-3.5 w-3.5 text-white" />
           </div>
-          <span className="font-bold tracking-tight">Team Task Manager</span>
+          <span className="font-bold tracking-tight">TaskFlow</span>
         </div>
         <div className="flex gap-1">
           {items.map((it) => (
