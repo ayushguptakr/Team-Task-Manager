@@ -48,15 +48,20 @@ const requireProjectAdmin = async (req, res, next) => {
       });
     }
 
-    const project = await Project.findOne({
-      _id: projectId,
-      members: {
-        $elemMatch: {
-          user: req.user._id,
-          role: 'admin',
+    let project;
+    if (req.user.role === 'admin') {
+      project = await Project.findById(projectId);
+    } else {
+      project = await Project.findOne({
+        _id: projectId,
+        members: {
+          $elemMatch: {
+            user: req.user._id,
+            role: 'admin',
+          },
         },
-      },
-    });
+      });
+    }
 
     if (!project) {
       return res.status(403).json({

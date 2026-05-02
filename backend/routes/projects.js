@@ -24,10 +24,11 @@ const sendValidationErrors = (req, res) => {
 
 const requireProjectMember = async (req, res, next) => {
   try {
-    const project = await Project.findOne({
-      _id: req.params.id,
-      'members.user': req.user._id,
-    }).populate('members.user', 'name email role');
+    const query = { _id: req.params.id };
+    if (req.user.role !== 'admin') {
+      query['members.user'] = req.user._id;
+    }
+    const project = await Project.findOne(query).populate('members.user', 'name email role');
 
     if (!project) {
       return res.status(404).json({
@@ -50,7 +51,8 @@ router.use(authenticate);
 
 router.get('/', async (req, res) => {
   try {
-    const projects = await Project.find({ 'members.user': req.user._id })
+    const query = req.user.role === 'admin' ? {} : { 'members.user': req.user._id };
+    const projects = await Project.find(query)
       .populate('createdBy', 'name email role')
       .populate('members.user', 'name email role')
       .sort({ createdAt: -1 });

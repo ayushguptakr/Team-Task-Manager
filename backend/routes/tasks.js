@@ -27,11 +27,13 @@ const sendValidationErrors = (req, res) => {
   return false;
 };
 
-const findProjectForUser = (projectId, userId) =>
-  Project.findOne({
-    _id: projectId,
-    'members.user': userId,
-  });
+const findProjectForUser = (projectId, user) => {
+  const query = { _id: projectId };
+  if (user.role !== 'admin') {
+    query['members.user'] = user._id;
+  }
+  return Project.findOne(query);
+};
 
 const requireTaskAccess = async (req, res, next) => {
   try {
@@ -44,7 +46,7 @@ const requireTaskAccess = async (req, res, next) => {
       });
     }
 
-    const project = await findProjectForUser(task.project, req.user._id);
+    const project = await findProjectForUser(task.project, req.user);
 
     if (!project) {
       return res.status(403).json({
@@ -79,6 +81,9 @@ const ensureAssigneeInProject = async (assigneeId, projectId) => {
 };
 
 const requireLoadedProjectAdmin = (req, res, next) => {
+  if (req.user.role === 'admin') {
+    return next();
+  }
   const member = req.project.members.find(
     (projectMember) => projectMember.user.toString() === req.user._id.toString()
   );
@@ -109,7 +114,7 @@ router.get(
     try {
       if (sendValidationErrors(req, res)) return;
 
-      const project = await findProjectForUser(req.query.projectId, req.user._id);
+      const project = await findProjectForUser(req.query.projectId, req.user);
 
       if (!project) {
         return res.status(403).json({
@@ -164,7 +169,7 @@ router.post(
     try {
       if (sendValidationErrors(req, res)) return;
 
-      const project = await findProjectForUser(req.body.project, req.user._id);
+      const project = await findProjectForUser(req.body.project, req.user);
 
       if (!project) {
         return res.status(403).json({

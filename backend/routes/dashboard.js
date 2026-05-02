@@ -17,7 +17,7 @@ router.get('/', async (req, res) => {
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
 
-    const assignedFilter = { assignee: req.user._id };
+    const assignedFilter = req.user.role === 'admin' ? {} : { assignee: req.user._id };
     const overdueFilter = {
       ...assignedFilter,
       dueDate: { $lt: startOfToday },
