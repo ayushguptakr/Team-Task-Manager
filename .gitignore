@@ -54,3 +54,6 @@ coverage
 
 # Typescript
 *.tsbuildinfo
+
+# Media
+Full-Stack Task Manager with Role-Based Access.mp4

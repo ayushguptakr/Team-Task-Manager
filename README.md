@@ -1,6 +1,12 @@
 # 🚀 TaskFlow - Team Task Manager
 
-![TaskFlow Banner](file:///C:/Users/Asus%20Pc/.gemini/antigravity/brain/e03dd9d4-af45-4dd0-92bd-4b66f850b1bd/taskflow_banner_1777743532542.png)
+
+## 📺 Video Demonstration
+
+Watch the full video explanation of the project:
+**[View on Loom](https://www.loom.com/share/63149076c3fd4670944b0286d1af407f)**
+
+---
 
 A high-performance, full-stack team task management application built with the MERN stack. TaskFlow provides a seamless experience for managing projects, tracking tasks, and collaborating with team members in real-time.
 
